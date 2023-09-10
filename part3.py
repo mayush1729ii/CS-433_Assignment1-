@@ -21,8 +21,28 @@ def get_process_id_for_port(port):
     except Exception as e:
         print(f"Error while getting process ID: {str(e)}")
     return None
+def get_ip_address():
+    try:
+        # Create a socket object
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        
+        # Connect to a remote server (doesn't have to be a real server)
+        s.connect(("8.8.8.8", 80))  # Using Google's DNS server
+        
+        # Get the local IP address from the socket's connection
+        ip_address = s.getsockname()[0]
+        
+        # Close the socket
+        s.close()
+        
+        return ip_address
+    except Exception as e:
+        print(f"Error while fetching IP address: {str(e)}")
+        return None
 
 def main():
+    # fetch this device's ip
+    my_ip = get_ip_address()
     # Create a raw socket for packet capture
     s = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(0x0003))
     
@@ -62,6 +82,7 @@ def main():
 
                 # Extract source and destination ports from TCP header (assuming it's TCP)
                 if ip_header[9] == 6:  # Check if the protocol is TCP (IP header's 10th byte)
+                # if source_ip == my_ip or dest_ip ==  my_ip:
                     tcp_header = packet[34:54]
                     tcp = struct.unpack("!HH", tcp_header[:4])
                     source_port = tcp[0]
@@ -69,27 +90,29 @@ def main():
                     print(f"Source Port: {source_port}, Destination Port: {dest_port}")
 
                     # Link packet data to process ID using the destination port
-                    if dest_port not in process_ids:
+                    if dest_port not in process_ids and dest_ip == my_ip:
                         process_id = get_process_id_for_port(dest_port)
                         if process_id:
                             process_ids[dest_port] = process_id
                             ports_with_pids.add(dest_port)
                     # Link packet data to process ID using the source port
-                    if dest_port not in process_ids:
+                    if source_port not in process_ids and source_ip == my_ip:
                         process_id = get_process_id_for_port(source_port)
                         if process_id:
                             process_ids[source_port] = process_id
                             ports_with_pids.add(source_port)
-                    print("Process Id:", process_id)
+                    if my_ip == dest_ip or my_ip == source_ip:
+                        print("Process Id:", process_id)
                     print("=" * 40)
             except KeyboardInterrupt:
                 print("\nStopped capturing packets.")
                 capture_packets = False
+        print(f"This device's IP:{my_ip}")
         while True:
             try:
                 port = int(input("Enter a port number to get the corresponding process ID (Ctrl+C to exit): "))
                 if port in process_ids:
-                    print(f"Process ID for Port {port}: {process_ids[port]}")
+                    print(f"Process ID for Port {port}: {process_ids[port].split('/')[0]}")
                 else:
                     print(f"No process found for Port {port}")
             except KeyboardInterrupt:
@@ -97,8 +120,11 @@ def main():
                 break
             except ValueError:
                 print("Invalid input. Please enter a valid port number.")
-        print("Ports with associated PIDs:")
+        print("Ports with associated PIDs and Program name:")
         for port in ports_with_pids:
+            # print(len(process_ids[port]),process_ids[port])
+            # for j in process_ids[port].split('/'):
+            #     print(j, end=' , ')
             print(f"Port {port}: Process ID {process_ids[port]}")
     except KeyboardInterrupt:
         print("\nCapture stopped by the user.")

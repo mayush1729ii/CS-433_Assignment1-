@@ -14,30 +14,11 @@ def reverse_dns_lookup(ip_address):
     except dns.exception.DNSException:
         return "Reverse DNS lookup failed"
 
-def get_ip_address():
-    try:
-        # Create a socket object
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        
-        # Connect to a remote server (doesn't have to be a real server)
-        s.connect(("8.8.8.8", 80))  # Using Google's DNS server
-        
-        # Get the local IP address from the socket's connection
-        ip_address = s.getsockname()[0]
-        
-        # Close the socket
-        s.close()
-        
-        return ip_address
-    except Exception as e:
-        print(f"Error while fetching IP address: {str(e)}")
-        return None
 
 
 
 def main():
-    # fetch this device's ip
-    my_ip = get_ip_address()
+    
     # Create a raw socket for packet capture
     s = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(0x0003))
     
@@ -84,9 +65,10 @@ def main():
                 source_port = tcp[0]
                 dest_port = tcp[1]
                 print(f"Source Port: {source_port}, Destination Port: {dest_port}")
-                if source_ip == my_ip:
+                # if source_ip == my_ip:
+                if (source_ip, source_port, dest_ip, dest_port) not in tcp_flows and (dest_ip, dest_port, source_ip, source_port) not in tcp_flows:
                     tcp_flows.add((source_ip, source_port, dest_ip, dest_port))
-                    tcp_flows_list.append((source_ip, source_port, dest_ip, dest_port))
+                tcp_flows_list.append((source_ip, source_port, dest_ip, dest_port))
                 # elif dest_ip == "10.0.2.15":
                 #     tcp_flows.add(( dest_ip, dest_port, source_ip, source_port))
                 #     tcp_flows_list.append(( dest_ip, dest_port, source_ip, source_port))
@@ -104,8 +86,8 @@ def main():
         s.close()
 
     
-    print(f"My device's IP addr after ifconfig: {my_ip}")
-    print("Number of flows:", len(tcp_flows))
+    
+    print("Number of unique flows:", len(tcp_flows))
     # print("Number of flows:", len(tcp_flows_list))
     print("Unique flows are:")
     for i in tcp_flows:
